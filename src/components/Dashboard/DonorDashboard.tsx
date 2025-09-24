@@ -4,6 +4,7 @@ import { Heart, TrendingUp, Users, DollarSign, Eye, MapPin } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Project, DashboardStats } from '../../types';
 import { api } from '../../services/api';
+import { onDonationEvent } from '../../services/events';
 
 const DonorDashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -27,6 +28,12 @@ const DonorDashboard: React.FC = () => {
     };
 
     fetchData();
+    // subscribe to donation events to update totals live
+    const off = onDonationEvent(({ projectId, amount }) => {
+      setProjects(prev => prev.map(p => p.id === projectId ? { ...p, raisedAmount: p.raisedAmount + amount } : p));
+      setStats(prev => prev ? { ...prev, totalDonations: prev.totalDonations + amount } : prev);
+    });
+    return off;
   }, []);
 
   const donationData = [
@@ -187,8 +194,8 @@ const DonorDashboard: React.FC = () => {
               </div>
               <div className="mt-4">
                 <div className="bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-blue-600 h-2 rounded-full" 
+                  <div
+                    className="bg-blue-600 h-2 rounded-full"
                     style={{ width: `${(project.raisedAmount / project.targetAmount) * 100}%` }}
                   ></div>
                 </div>

@@ -10,18 +10,21 @@ const Register: React.FC = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'donor' as 'donor' | 'ngo' | 'beneficiary' | 'vendor' | 'government'
+    role: 'donor' as 'donor' | 'ngo' | 'beneficiary' | 'vendor' | 'government',
+    aadhaar: '',
+    ngoRegNumber: '',
+    ngoDocAuth: 0.9
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  
+
   const { register } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (formData.password !== formData.confirmPassword) {
       toast.error('Passwords do not match');
       return;
@@ -192,6 +195,61 @@ const Register: React.FC = () => {
                 </button>
               </div>
             </div>
+
+            <div>
+              <label htmlFor="aadhaar" className="block text-sm font-medium text-gray-700">
+                Aadhaar Number (demo)
+              </label>
+              <div className="mt-1 relative">
+                <input
+                  id="aadhaar"
+                  name="aadhaar"
+                  type="text"
+                  required
+                  value={formData.aadhaar}
+                  onChange={handleChange}
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="1234-5678-9012"
+                />
+              </div>
+            </div>
+
+            {formData.role === 'ngo' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="ngoRegNumber" className="block text-sm font-medium text-gray-700">
+                    NGO Registration Number (demo)
+                  </label>
+                  <input
+                    id="ngoRegNumber"
+                    name="ngoRegNumber"
+                    type="text"
+                    required
+                    value={formData.ngoRegNumber}
+                    onChange={handleChange}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="NGO-REG-001"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="ngoDocAuth" className="block text-sm font-medium text-gray-700">
+                    AI Doc Authenticity (demo)
+                  </label>
+                  <input
+                    id="ngoDocAuth"
+                    name="ngoDocAuth"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="1"
+                    value={formData.ngoDocAuth}
+                    onChange={handleChange}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <p className="text-xs text-gray-500">Must be ≥ 0.85 to pass verification</p>
+                </div>
+              </div>
+            )}
 
             <div>
               <button

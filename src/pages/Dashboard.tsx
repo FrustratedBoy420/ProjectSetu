@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import DonorDashboard from '../components/Dashboard/DonorDashboard';
 import NGODashboard from '../components/Dashboard/NGODashboard';
+import TransparencyDashboard from '../components/Dashboard/TransparencyDashboard';
 import { Shield, AlertCircle } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
@@ -14,8 +15,8 @@ const Dashboard: React.FC = () => {
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h2>
           <p className="text-gray-600 mb-4">Please log in to access your dashboard.</p>
-          <a 
-            href="/login" 
+          <a
+            href="/login"
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
           >
             Go to Login
@@ -28,28 +29,24 @@ const Dashboard: React.FC = () => {
   const renderDashboard = () => {
     switch (user.role) {
       case 'donor':
-        return <DonorDashboard />;
+        return (
+          <div className="space-y-8">
+            <TransparencyDashboard />
+            <DonorDashboard />
+          </div>
+        );
       case 'ngo':
       case 'government':
         return <NGODashboard />;
       case 'beneficiary':
-        return (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-            <Shield className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Beneficiary Dashboard</h2>
-            <p className="text-gray-600">
-              Your beneficiary dashboard is coming soon. You'll be able to track services 
-              received and provide feedback on project implementations.
-            </p>
-          </div>
-        );
+        return <TransparencyDashboard />;
       case 'vendor':
         return (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
             <Shield className="h-12 w-12 text-green-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Vendor Dashboard</h2>
             <p className="text-gray-600">
-              Your vendor dashboard is coming soon. You'll be able to submit proof of delivery, 
+              Your vendor dashboard is coming soon. You'll be able to submit proof of delivery,
               track payments, and manage your service contracts.
             </p>
           </div>

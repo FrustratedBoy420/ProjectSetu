@@ -11,6 +11,7 @@ import ProjectDetails from './pages/ProjectDetails';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import PublicLedger from './pages/PublicLedger';
 
 function App() {
   return (
@@ -25,10 +26,11 @@ function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/ledger" element={<PublicLedger />} />
             </Routes>
             <FinancialAdvisorBot />
           </Layout>
-          <Toaster 
+          <Toaster
             position="top-right"
             toastOptions={{
               duration: 4000,

@@ -11,6 +11,7 @@ interface Message {
 
 const FinancialAdvisorBot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [language, setLanguage] = useState((navigator?.language || 'en').split('-')[0]);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -46,8 +47,8 @@ const FinancialAdvisorBot: React.FC = () => {
     setIsTyping(true);
 
     try {
-      const response = await api.sendChatMessage(inputMessage);
-      
+      const response = await api.sendChatMessage(inputMessage, language);
+
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
         text: response,
@@ -95,7 +96,7 @@ const FinancialAdvisorBot: React.FC = () => {
 
       {/* Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 w-96 h-96 bg-white rounded-lg shadow-xl border border-gray-200 flex flex-col z-50">
+        <div className="fixed bottom-24 right-4 sm:right-6 w-[90vw] sm:w-96 h-[70vh] sm:h-96 bg-white rounded-lg shadow-xl border border-gray-200 flex flex-col z-50">
           {/* Header */}
           <div className="bg-blue-600 text-white p-4 rounded-t-lg flex items-center space-x-2">
             <Bot className="h-5 w-5" />
@@ -113,20 +114,18 @@ const FinancialAdvisorBot: React.FC = () => {
                 className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-xs px-3 py-2 rounded-lg ${
-                    message.sender === 'user'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-900'
-                  }`}
+                  className={`max-w-xs px-3 py-2 rounded-lg ${message.sender === 'user'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-900'
+                    }`}
                 >
                   <div className="flex items-start space-x-2">
                     {message.sender === 'bot' && <Bot className="h-4 w-4 mt-0.5 flex-shrink-0" />}
                     {message.sender === 'user' && <User className="h-4 w-4 mt-0.5 flex-shrink-0" />}
                     <div>
                       <p className="text-sm">{message.text}</p>
-                      <p className={`text-xs mt-1 ${
-                        message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
-                      }`}>
+                      <p className={`text-xs mt-1 ${message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
+                        }`}>
                         {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
@@ -174,6 +173,17 @@ const FinancialAdvisorBot: React.FC = () => {
           {/* Input */}
           <div className="border-t border-gray-200 p-4">
             <div className="flex space-x-2">
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className="border border-gray-300 rounded-lg px-2 text-xs text-gray-700"
+              >
+                <option value="en">EN</option>
+                <option value="hi">HI</option>
+                <option value="bn">BN</option>
+                <option value="ta">TA</option>
+                <option value="te">TE</option>
+              </select>
               <input
                 type="text"
                 value={inputMessage}

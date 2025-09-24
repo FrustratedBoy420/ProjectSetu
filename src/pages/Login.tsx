@@ -8,8 +8,9 @@ const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [aadhaar, setAadhaar] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -18,7 +19,7 @@ const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      await login(email, password);
+      await login(email, password, aadhaar);
       toast.success('Login successful!');
       navigate('/dashboard');
     } catch (error) {
@@ -100,6 +101,24 @@ const Login: React.FC = () => {
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="aadhaar" className="block text-sm font-medium text-gray-700">
+                Aadhaar Number (demo)
+              </label>
+              <div className="mt-1">
+                <input
+                  id="aadhaar"
+                  name="aadhaar"
+                  type="text"
+                  required
+                  value={aadhaar}
+                  onChange={(e) => setAadhaar(e.target.value)}
+                  placeholder="1234-5678-9012"
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                />
               </div>
             </div>
 

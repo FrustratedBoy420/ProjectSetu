@@ -67,6 +67,8 @@ export interface Expenditure {
     feedback: string;
     timestamp: Date;
   };
+  approvals?: { beneficiaryId: string; approved: boolean; timestamp: Date }[];
+  quorum?: { required: number; current: number; achieved: boolean };
   createdAt: Date;
 }
 
@@ -100,4 +102,27 @@ export interface DashboardStats {
     projectsCompleted: number;
     fundsUtilized: number;
   };
+}
+
+export interface Vendor {
+  id: string;
+  name: string;
+  category: string;
+  rating: number;
+  location: string;
+}
+
+export interface VendorAssignment {
+  expenditureId: string;
+  vendorId: string;
+}
+
+export interface Review {
+  id: string;
+  projectId: string;
+  userId: string;
+  userName: string;
+  rating: number; // 1-5
+  comment: string;
+  createdAt: Date;
 }

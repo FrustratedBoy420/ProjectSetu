@@ -1,4 +1,5 @@
-import { Project, Transaction, Expenditure, Beneficiary, DashboardStats } from '../types';
+import { Project, Transaction, Expenditure, DashboardStats, Vendor, Review } from '../types';
+import { emitDonationEvent } from './events';
 
 // Mock data
 const mockProjects: Project[] = [
@@ -181,6 +182,19 @@ const mockExpenditures: Expenditure[] = [
   }
 ];
 
+const mockVendors: Vendor[] = [
+  { id: 'vendor1', name: 'AquaTech Solutions', category: 'Equipment', rating: 4.6, location: 'Jaipur' },
+  { id: 'vendor2', name: 'HealthCare Supplies Ltd', category: 'Supplies', rating: 4.5, location: 'Jaipur' },
+  { id: 'vendor3', name: 'BoreWell Pros', category: 'Infrastructure', rating: 4.3, location: 'Jaipur' },
+  { id: 'vendor4', name: 'Community Trainers Co', category: 'Training', rating: 4.7, location: 'Jaipur' },
+  { id: 'vendor5', name: 'BuildRight Construction', category: 'Infrastructure', rating: 4.4, location: 'Patna' },
+  { id: 'vendor6', name: 'EduSupply Co.', category: 'Supplies', rating: 4.2, location: 'Patna' },
+  { id: 'vendor7', name: 'Stationery Hub', category: 'Supplies', rating: 4.1, location: 'Delhi' },
+  { id: 'vendor8', name: 'Green Earth Equipments', category: 'Equipment', rating: 4.0, location: 'Delhi' },
+  { id: 'vendor9', name: 'Swift Logistics', category: 'Logistics', rating: 4.3, location: 'Delhi' },
+  { id: 'vendor10', name: 'SkillBridge Trainers', category: 'Training', rating: 4.8, location: 'Mumbai' }
+];
+
 export const api = {
   // Projects
   getProjects: async (): Promise<Project[]> => {
@@ -196,7 +210,7 @@ export const api = {
   // Transactions
   createTransaction: async (projectId: string, amount: number): Promise<Transaction> => {
     await new Promise(resolve => setTimeout(resolve, 1000));
-    return {
+    const tx = {
       id: Date.now().toString(),
       projectId,
       donorId: 'donor1',
@@ -205,7 +219,10 @@ export const api = {
       blockchainHash: `0x${Math.random().toString(16).substr(2, 64)}`,
       status: 'completed',
       createdAt: new Date()
-    };
+    } as Transaction;
+    // emit donation event for real-time UI updates
+    emitDonationEvent({ projectId, amount });
+    return tx;
   },
 
   // Expenditures
@@ -231,11 +248,55 @@ export const api = {
   updateExpenditure: async (id: string, updates: Partial<Expenditure>): Promise<Expenditure> => {
     await new Promise(resolve => setTimeout(resolve, 600));
     const existing = mockExpenditures.find(e => e.id === id);
-    return { ...existing!, ...updates };
+    const updated = { ...existing!, ...updates } as Expenditure;
+    const index = mockExpenditures.findIndex(e => e.id === id);
+    if (index >= 0) mockExpenditures[index] = updated;
+    return updated;
+  },
+
+  // Vendors
+  getVendors: async (category?: string): Promise<Vendor[]> => {
+    await new Promise(resolve => setTimeout(resolve, 400));
+    return category ? mockVendors.filter(v => v.category === category) : mockVendors;
+  },
+
+  assignVendorToExpenditure: async (expenditureId: string, vendorId: string): Promise<Expenditure> => {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const existing = mockExpenditures.find(e => e.id === expenditureId);
+    if (!existing) throw new Error('Expenditure not found');
+    return await api.updateExpenditure(expenditureId, { vendorId, status: 'pending' });
+  },
+
+  uploadVendorProof: async (
+    expenditureId: string,
+    files: File[],
+    description: string,
+    location: [number, number]
+  ): Promise<Expenditure> => {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    const imageUrls = files.map(() => 'https://images.pexels.com/photos/1720186/pexels-photo-1720186.jpeg');
+    const proof = {
+      images: imageUrls,
+      location,
+      timestamp: new Date(),
+      description
+    } as Expenditure['vendorProof'];
+    // Auto-run AI verification mock
+    const ai = {
+      ocrResults: { quantity: 50, brand: 'Generic', price: Math.floor(Math.random() * 20000) + 5000 },
+      authenticity: 0.9 + Math.random() * 0.08,
+      anomalies: Math.random() > 0.85 ? ['Low-resolution image detected'] : [],
+      verified: Math.random() > 0.05,
+      timestamp: new Date()
+    } as Expenditure['aiVerification'];
+    const existing = mockExpenditures.find(e => e.id === expenditureId);
+    const approvals = existing?.approvals || [];
+    const quorum = existing?.quorum || { required: 3, current: approvals.filter(a => a.approved).length, achieved: false };
+    return await api.updateExpenditure(expenditureId, { vendorProof: proof, aiVerification: ai, status: 'vendor_submitted', approvals, quorum });
   },
 
   // AI Verification
-  verifyDocument: async (file: File): Promise<any> => {
+  verifyDocument: async (_file: File): Promise<any> => {
     await new Promise(resolve => setTimeout(resolve, 2000));
     return {
       ocrResults: {
@@ -249,8 +310,18 @@ export const api = {
     };
   },
 
+  verifyReceiptOCR: async (_file: File): Promise<{ brand: string; quantity: number; price: number; withinBudget: boolean; anomalies: string[] }> => {
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    const brand = ['Generic', 'BrandX', 'BrandY'][Math.floor(Math.random() * 3)];
+    const quantity = Math.floor(Math.random() * 100) + 1;
+    const price = Math.floor(Math.random() * 50000) + 1000;
+    const withinBudget = price < 40000;
+    const anomalies = withinBudget ? [] : ['Price exceeds pre-approved budget'];
+    return { brand, quantity, price, withinBudget, anomalies };
+  },
+
   // Dashboard Stats
-  getDashboardStats: async (userId: string, role: string): Promise<DashboardStats> => {
+  getDashboardStats: async (_userId: string, _role: string): Promise<DashboardStats> => {
     await new Promise(resolve => setTimeout(resolve, 600));
     return {
       totalDonations: 1250000,
@@ -265,10 +336,25 @@ export const api = {
     };
   },
 
+  // Beneficiary approvals
+  submitBeneficiaryApproval: async (expenditureId: string, beneficiaryId: string, approved: boolean, _feedback: string): Promise<Expenditure> => {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const existing = mockExpenditures.find(e => e.id === expenditureId);
+    if (!existing) throw new Error('Expenditure not found');
+    const approvals = existing.approvals ? [...existing.approvals] : [];
+    const already = approvals.find(a => a.beneficiaryId === beneficiaryId);
+    if (!already) approvals.push({ beneficiaryId, approved, timestamp: new Date() });
+    const current = approvals.filter(a => a.approved).length;
+    const required = existing.quorum?.required ?? 3;
+    const achieved = current >= required;
+    const status = achieved ? 'beneficiary_approved' : existing.status;
+    return await api.updateExpenditure(expenditureId, { approvals, quorum: { required, current, achieved }, status });
+  },
+
   // Chatbot
-  sendChatMessage: async (message: string, language: string = 'en'): Promise<string> => {
+  sendChatMessage: async (message: string, _language: string = 'en'): Promise<string> => {
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
     const responses = {
       'how to donate': 'To make a donation, go to the Projects page, select a project you want to support, and click "Donate Now". You can pay using your connected wallet or traditional payment methods.',
       'track donation': 'You can track your donations in real-time through your dashboard. Every transaction is recorded on the blockchain for complete transparency.',
@@ -280,7 +366,36 @@ export const api = {
     if (lowerMessage.includes('donate')) return responses['how to donate'];
     if (lowerMessage.includes('track')) return responses['track donation'];
     if (lowerMessage.includes('triple') || lowerMessage.includes('lock')) return responses['triple lock'];
-    
+
     return responses['default'];
   }
 };
+
+// Public data helpers
+export async function getPublicLedger(): Promise<Expenditure[]> {
+  await new Promise(resolve => setTimeout(resolve, 300));
+  return mockExpenditures.filter(e => e.status === 'beneficiary_approved' || e.status === 'completed');
+}
+
+// Reviews (in-memory mock)
+const mockReviews: Review[] = [];
+
+export async function getProjectReviews(projectId: string): Promise<Review[]> {
+  await new Promise(resolve => setTimeout(resolve, 300));
+  return mockReviews.filter(r => r.projectId === projectId);
+}
+
+export async function addProjectReview(projectId: string, userId: string, userName: string, rating: number, comment: string): Promise<Review> {
+  await new Promise(resolve => setTimeout(resolve, 300));
+  const review: Review = {
+    id: Date.now().toString(),
+    projectId,
+    userId,
+    userName,
+    rating,
+    comment,
+    createdAt: new Date()
+  };
+  mockReviews.unshift(review);
+  return review;
+}

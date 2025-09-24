@@ -13,7 +13,7 @@ const Projects: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [donationAmount, setDonationAmount] = useState<{ [key: string]: string }>({});
   const [donatingTo, setDonatingTo] = useState<string | null>(null);
-  
+
   const { user } = useAuth();
   const { connected, sendTransaction } = useWeb3();
 
@@ -34,9 +34,9 @@ const Projects: React.FC = () => {
   }, []);
 
   const categories = ['all', 'Education', 'Water & Sanitation', 'Healthcare', 'Environment'];
-  
-  const filteredProjects = selectedCategory === 'all' 
-    ? projects 
+
+  const filteredProjects = selectedCategory === 'all'
+    ? projects
     : projects.filter(project => project.category === selectedCategory);
 
   const handleDonate = async (projectId: string) => {
@@ -57,26 +57,26 @@ const Projects: React.FC = () => {
     }
 
     setDonatingTo(projectId);
-    
+
     try {
       // Simulate blockchain transaction
       const txHash = await sendTransaction('0x742d35Cc6634C0532925a3b8D4C9db96DfbF3b87', amount);
-      
+
       // Create transaction record
       await api.createTransaction(projectId, parseFloat(amount));
-      
+
       toast.success('Donation successful! Transaction recorded on blockchain.');
-      
+
       // Update project raised amount locally
-      setProjects(prev => prev.map(project => 
-        project.id === projectId 
+      setProjects(prev => prev.map(project =>
+        project.id === projectId
           ? { ...project, raisedAmount: project.raisedAmount + parseFloat(amount) }
           : project
       ));
-      
+
       // Clear donation amount
       setDonationAmount(prev => ({ ...prev, [projectId]: '' }));
-      
+
     } catch (error) {
       console.error('Donation failed:', error);
       toast.error('Donation failed. Please try again.');
@@ -117,11 +117,10 @@ const Projects: React.FC = () => {
               <button
                 key={category}
                 onClick={() => setSelectedCategory(category)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  selectedCategory === category
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                }`}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedCategory === category
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
               >
                 {category === 'all' ? 'All Categories' : category}
               </button>
@@ -133,22 +132,21 @@ const Projects: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
           {filteredProjects.map((project) => (
             <div key={project.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
-              <img 
-                src={project.images[0]} 
+              <img
+                src={project.images[0]}
                 alt={project.title}
                 className="w-full h-48 object-cover"
               />
-              
+
               <div className="p-6">
                 <div className="flex items-center justify-between mb-2">
                   <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
                     {project.category}
                   </span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                    project.status === 'active' 
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
+                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${project.status === 'active'
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-gray-100 text-gray-800'
+                    }`}>
                     {project.status.toUpperCase()}
                   </span>
                 </div>
@@ -180,8 +178,8 @@ const Projects: React.FC = () => {
                     </span>
                   </div>
                   <div className="bg-gray-200 rounded-full h-2 mb-2">
-                    <div 
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${(project.raisedAmount / project.targetAmount) * 100}%` }}
                     ></div>
                   </div>
@@ -195,9 +193,9 @@ const Projects: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Donation Section */}
-                {user && user.role === 'donor' && (
-                  <div className="border-t border-gray-200 pt-4">
+                {/* Donate or View Details */}
+                <div className="border-t border-gray-200 pt-4 flex flex-col gap-2">
+                  {user && user.role === 'donor' && (
                     <div className="flex space-x-2">
                       <input
                         type="number"
@@ -207,11 +205,12 @@ const Projects: React.FC = () => {
                           ...prev,
                           [project.id]: e.target.value
                         }))}
+                        max={(project.targetAmount - project.raisedAmount).toString()}
                         className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                       <button
                         onClick={() => handleDonate(project.id)}
-                        disabled={donatingTo === project.id || !connected}
+                        disabled={donatingTo === project.id || !connected || project.raisedAmount >= project.targetAmount}
                         className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
                       >
                         {donatingTo === project.id ? (
@@ -224,22 +223,20 @@ const Projects: React.FC = () => {
                         )}
                       </button>
                     </div>
-                    {!connected && (
-                      <p className="text-xs text-red-600 mt-1">Connect your wallet to donate</p>
-                    )}
-                  </div>
-                )}
-
-                {/* View Details Button for non-donors */}
-                {(!user || user.role !== 'donor') && (
-                  <Link 
+                  )}
+                  {user && user.role === 'donor' && (
+                    <div className="text-xs text-gray-500">
+                      Remaining you can donate: ₹{Math.max(project.targetAmount - project.raisedAmount, 0).toLocaleString()}
+                    </div>
+                  )}
+                  <Link
                     to={`/projects/${project.id}`}
                     className="w-full bg-gray-100 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors flex items-center justify-center space-x-1"
                   >
                     <TrendingUp className="h-4 w-4" />
                     <span>View Details</span>
                   </Link>
-                )}
+                </div>
               </div>
             </div>
           ))}
@@ -252,8 +249,8 @@ const Projects: React.FC = () => {
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">No projects found</h3>
             <p className="text-gray-600">
-              {selectedCategory === 'all' 
-                ? 'No projects are currently available.' 
+              {selectedCategory === 'all'
+                ? 'No projects are currently available.'
                 : `No projects found in the ${selectedCategory} category.`
               }
             </p>

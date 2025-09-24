@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { MapPin, Users, Calendar, Heart, TrendingUp, ArrowLeft, Eye, CheckCircle, Clock, AlertTriangle, Camera, Brain, User } from 'lucide-react';
 import { Project, Expenditure } from '../types';
-import { api } from '../services/api';
+import { api, getProjectReviews, addProjectReview } from '../services/api';
+import { Star } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useWeb3 } from '../contexts/Web3Context';
 import toast from 'react-hot-toast';
@@ -14,24 +15,39 @@ const ProjectDetails: React.FC = () => {
   const [expenditures, setExpenditures] = useState<Expenditure[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'expenditures' | 'transparency'>('overview');
+  const [reviews, setReviews] = useState<{ id: string; userName: string; rating: number; comment: string; createdAt: Date }[]>([]);
+  const [newRating, setNewRating] = useState<number>(0);
+  const [newComment, setNewComment] = useState('');
   const [donationAmount, setDonationAmount] = useState('');
   const [donating, setDonating] = useState(false);
-  
+
   const { user } = useAuth();
   const { connected, sendTransaction } = useWeb3();
+  useEffect(() => {
+    // update raised amount live on donation events
+    const { onDonationEvent } = require('../services/events');
+    const off = onDonationEvent(({ projectId, amount }: { projectId: string; amount: number }) => {
+      if (projectId === id) {
+        setProject(prev => prev ? { ...prev, raisedAmount: prev.raisedAmount + amount } : prev);
+      }
+    });
+    return off;
+  }, [id]);
 
   useEffect(() => {
     const fetchProjectData = async () => {
       if (!id) return;
-      
+
       try {
-        const [projectData, expendituresData] = await Promise.all([
+        const [projectData, expendituresData, reviewsData] = await Promise.all([
           api.getProject(id),
-          api.getExpenditures(id)
+          api.getExpenditures(id),
+          getProjectReviews(id)
         ]);
-        
+
         setProject(projectData);
         setExpenditures(expendituresData);
+        setReviews(reviewsData);
       } catch (error) {
         console.error('Failed to fetch project data:', error);
         toast.error('Failed to load project details');
@@ -54,28 +70,33 @@ const ProjectDetails: React.FC = () => {
       return;
     }
 
+    const remaining = project ? project.targetAmount - project.raisedAmount : 0;
     if (!donationAmount || parseFloat(donationAmount) <= 0) {
       toast.error('Please enter a valid donation amount');
       return;
     }
+    if (parseFloat(donationAmount) > remaining) {
+      toast.error(`You can donate up to ₹${remaining.toLocaleString()} for this project`);
+      return;
+    }
 
     setDonating(true);
-    
+
     try {
       const txHash = await sendTransaction('0x742d35Cc6634C0532925a3b8D4C9db96DfbF3b87', donationAmount);
       await api.createTransaction(id!, parseFloat(donationAmount));
-      
+
       toast.success('Donation successful! Transaction recorded on blockchain.');
-      
+
       if (project) {
-        setProject(prev => prev ? { 
-          ...prev, 
-          raisedAmount: prev.raisedAmount + parseFloat(donationAmount) 
+        setProject(prev => prev ? {
+          ...prev,
+          raisedAmount: prev.raisedAmount + parseFloat(donationAmount)
         } : null);
       }
-      
+
       setDonationAmount('');
-      
+
     } catch (error) {
       console.error('Donation failed:', error);
       toast.error('Donation failed. Please try again.');
@@ -144,12 +165,12 @@ const ProjectDetails: React.FC = () => {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Projects
           </Link>
-          
+
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
             <div className="flex-1">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">{project.title}</h1>
               <p className="text-gray-600 mb-4">{project.description}</p>
-              
+
               <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
                 <div className="flex items-center">
                   <MapPin className="h-4 w-4 mr-1" />
@@ -176,11 +197,13 @@ const ProjectDetails: React.FC = () => {
                       placeholder="Amount (₹)"
                       value={donationAmount}
                       onChange={(e) => setDonationAmount(e.target.value)}
+                      max={(project.targetAmount - project.raisedAmount).toString()}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
+                    <p className="text-xs text-gray-500">Remaining you can donate: ₹{Math.max(project.targetAmount - project.raisedAmount, 0).toLocaleString()}</p>
                     <button
                       onClick={handleDonate}
-                      disabled={donating || !connected}
+                      disabled={donating || !connected || project.raisedAmount >= project.targetAmount}
                       className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                     >
                       {donating ? (
@@ -199,6 +222,13 @@ const ProjectDetails: React.FC = () => {
                 </div>
               </div>
             )}
+            {/* Total Raised card always visible */}
+            <div className="mt-6 lg:mt-0 lg:ml-8">
+              <div className="bg-white border border-gray-200 rounded-lg p-4 min-w-[260px]">
+                <h3 className="font-semibold text-gray-900 mb-2">Total Donations</h3>
+                <div className="text-2xl font-bold text-blue-600">₹{project.raisedAmount.toLocaleString()}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -215,11 +245,10 @@ const ProjectDetails: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${activeTab === tab.id
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
               >
                 <tab.icon className="h-4 w-4" />
                 <span>{tab.label}</span>
@@ -233,8 +262,8 @@ const ProjectDetails: React.FC = () => {
           <div className="space-y-8">
             {/* Project Image */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-              <img 
-                src={project.images[0]} 
+              <img
+                src={project.images[0]}
                 alt={project.title}
                 className="w-full h-64 object-cover"
               />
@@ -250,8 +279,8 @@ const ProjectDetails: React.FC = () => {
                     <span className="font-medium">₹{project.raisedAmount.toLocaleString()}</span>
                   </div>
                   <div className="bg-gray-200 rounded-full h-3">
-                    <div 
-                      className="bg-blue-600 h-3 rounded-full transition-all duration-300" 
+                    <div
+                      className="bg-blue-600 h-3 rounded-full transition-all duration-300"
                       style={{ width: `${Math.min((project.raisedAmount / project.targetAmount) * 100, 100)}%` }}
                     ></div>
                   </div>
@@ -339,6 +368,73 @@ const ProjectDetails: React.FC = () => {
                 ))}
               </div>
             </div>
+
+            {/* Ratings & Reviews */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Ratings & Reviews</h3>
+                <div className="flex items-center gap-1 text-yellow-500">
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <Star key={n} className={`h-4 w-4 ${(reviews.reduce((a, r) => a + r.rating, 0) / Math.max(reviews.length, 1)) >= n ? 'fill-current' : ''}`} />
+                  ))}
+                  <span className="text-xs text-gray-500 ml-2">({reviews.length})</span>
+                </div>
+              </div>
+
+              {user && (user.role === 'donor' || user.role === 'beneficiary') && (
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <button key={n} onClick={() => setNewRating(n)}>
+                        <Star className={`h-5 w-5 ${newRating >= n ? 'text-yellow-500 fill-current' : 'text-gray-300'}`} />
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      placeholder="Share your experience..."
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={async () => {
+                        if (!newRating) { toast.error('Please select a rating'); return; }
+                        const review = await addProjectReview(id!, user.id, user.name, newRating, newComment);
+                        setReviews(prev => [review, ...prev]);
+                        setNewRating(0);
+                        setNewComment('');
+                        toast.success('Review submitted');
+                      }}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700"
+                    >
+                      Submit
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {reviews.map(r => (
+                  <div key={r.id} className="border border-gray-100 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium text-gray-900 text-sm">{r.userName}</div>
+                      <div className="flex items-center gap-1 text-yellow-500">
+                        {[1, 2, 3, 4, 5].map(n => (
+                          <Star key={n} className={`h-3 w-3 ${r.rating >= n ? 'fill-current' : ''}`} />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="text-sm text-gray-600 mt-1">{r.comment}</div>
+                    <div className="text-xs text-gray-400 mt-1">{r.createdAt.toLocaleString()}</div>
+                  </div>
+                ))}
+                {reviews.length === 0 && (
+                  <div className="text-sm text-gray-500">No reviews yet.</div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -399,9 +495,8 @@ const ProjectDetails: React.FC = () => {
                       <h4 className="font-medium text-gray-900 mb-3">Triple-Lock Verification Status</h4>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Vendor Proof */}
-                        <div className={`p-3 rounded-lg border-2 ${
-                          expenditure.vendorProof ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'
-                        }`}>
+                        <div className={`p-3 rounded-lg border-2 ${expenditure.vendorProof ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'
+                          }`}>
                           <div className="flex items-center space-x-2 mb-2">
                             <Camera className="h-4 w-4 text-blue-600" />
                             <span className="text-sm font-medium">Vendor Proof</span>
@@ -423,9 +518,8 @@ const ProjectDetails: React.FC = () => {
                         </div>
 
                         {/* AI Verification */}
-                        <div className={`p-3 rounded-lg border-2 ${
-                          expenditure.aiVerification ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'
-                        }`}>
+                        <div className={`p-3 rounded-lg border-2 ${expenditure.aiVerification ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'
+                          }`}>
                           <div className="flex items-center space-x-2 mb-2">
                             <Brain className="h-4 w-4 text-purple-600" />
                             <span className="text-sm font-medium">AI Verification</span>
@@ -447,9 +541,8 @@ const ProjectDetails: React.FC = () => {
                         </div>
 
                         {/* Beneficiary Approval */}
-                        <div className={`p-3 rounded-lg border-2 ${
-                          expenditure.beneficiaryApproval ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'
-                        }`}>
+                        <div className={`p-3 rounded-lg border-2 ${expenditure.beneficiaryApproval ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'
+                          }`}>
                           <div className="flex items-center space-x-2 mb-2">
                             <User className="h-4 w-4 text-green-600" />
                             <span className="text-sm font-medium">Beneficiary Consent</span>
@@ -582,8 +675,8 @@ const ProjectDetails: React.FC = () => {
               <div className="mt-8 p-6 bg-blue-50 rounded-lg">
                 <h3 className="text-lg font-semibold text-blue-900 mb-2">Our Transparency Commitment</h3>
                 <p className="text-blue-800 text-sm">
-                  Every transaction in this project is verified through our Triple-Lock system and recorded on the blockchain. 
-                  This ensures complete transparency and accountability. All stakeholders - donors, beneficiaries, and the 
+                  Every transaction in this project is verified through our Triple-Lock system and recorded on the blockchain.
+                  This ensures complete transparency and accountability. All stakeholders - donors, beneficiaries, and the
                   general public - can verify how funds are being utilized in real-time.
                 </p>
               </div>
