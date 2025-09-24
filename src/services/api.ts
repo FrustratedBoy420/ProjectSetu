@@ -267,6 +267,47 @@ export const api = {
     return await api.updateExpenditure(expenditureId, { vendorId, status: 'pending' });
   },
 
+  // --- Vendor dashboard mocks ---
+  getVendorRequests: async (_vendorId: string): Promise<Array<{ id: string; ngoId: string; ngoName: string; projectId: string; projectTitle: string; description: string; amount: number; status: 'pending' | 'accepted' | 'completed'; createdAt: Date; expenditureId?: string }>> => {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    // Link first expenditure as an example request
+    const first = mockExpenditures[0];
+    return [
+      { id: 'req1', ngoId: 'ngo1', ngoName: 'Water for All Foundation', projectId: '1', projectTitle: 'Clean Water Initiative', description: first.description, amount: first.amount, status: 'pending', createdAt: new Date('2024-02-20'), expenditureId: first.id }
+    ];
+  },
+
+  updateVendorRequestStatus: async (_vendorId: string, _requestId: string, status: 'pending' | 'accepted' | 'completed') => {
+    await new Promise(resolve => setTimeout(resolve, 200));
+    return { id: _requestId, ngoId: 'ngo1', ngoName: 'Water for All Foundation', projectId: '1', projectTitle: 'Clean Water Initiative', description: 'Updated', amount: 10000, status, createdAt: new Date(), expenditureId: mockExpenditures[0]?.id };
+  },
+
+  getVendorPayments: async (vendorId: string): Promise<Expenditure[]> => {
+    await new Promise(resolve => setTimeout(resolve, 250));
+    return mockExpenditures.filter(e => e.vendorId === vendorId);
+  },
+
+  getVendorProfile: async (_vendorId: string): Promise<{ about: string; website?: string; contacts?: string }> => {
+    await new Promise(resolve => setTimeout(resolve, 200));
+    return { about: 'We deliver quality services to NGOs with transparency.' };
+  },
+
+  updateVendorProfile: async (_vendorId: string, data: { about?: string; website?: string; contacts?: string }): Promise<{ about: string; website?: string; contacts?: string }> => {
+    await new Promise(resolve => setTimeout(resolve, 200));
+    return { about: data.about || 'We deliver quality services to NGOs with transparency.', website: data.website, contacts: data.contacts };
+  },
+
+  // Notifications (mock)
+  getNotifications: async (_toId: string): Promise<Array<{ id: string; title: string; message: string; createdAt: Date; read: boolean }>> => {
+    await new Promise(resolve => setTimeout(resolve, 120));
+    return [
+      { id: 'n1', title: 'Welcome', message: 'You will receive NGO requests here.', createdAt: new Date(), read: false }
+    ];
+  },
+  markNotificationRead: async (_toId: string, _notificationId: string): Promise<void> => {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  },
+
   uploadVendorProof: async (
     expenditureId: string,
     files: File[],
@@ -379,6 +420,7 @@ export async function getPublicLedger(): Promise<Expenditure[]> {
 
 // Reviews (in-memory mock)
 const mockReviews: Review[] = [];
+const vendorReviewStore: Array<{ id: string; vendorId: string; userId: string; userName: string; rating: number; comment: string; createdAt: Date }> = [];
 
 export async function getProjectReviews(projectId: string): Promise<Review[]> {
   await new Promise(resolve => setTimeout(resolve, 300));
@@ -398,4 +440,16 @@ export async function addProjectReview(projectId: string, userId: string, userNa
   };
   mockReviews.unshift(review);
   return review;
+}
+
+export async function addVendorReview(vendorId: string, userId: string, userName: string, rating: number, comment: string) {
+  await new Promise(resolve => setTimeout(resolve, 200));
+  const r = { id: Date.now().toString(), vendorId, userId, userName, rating, comment, createdAt: new Date() };
+  vendorReviewStore.unshift(r);
+  return r;
+}
+
+export async function getVendorReviews(vendorId: string) {
+  await new Promise(resolve => setTimeout(resolve, 200));
+  return vendorReviewStore.filter(r => r.vendorId === vendorId);
 }

@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import DonorDashboard from '../components/Dashboard/DonorDashboard';
 import NGODashboard from '../components/Dashboard/NGODashboard';
 import TransparencyDashboard from '../components/Dashboard/TransparencyDashboard';
+import VendorDashboard from '../components/Dashboard/VendorDashboard';
 import { Shield, AlertCircle } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
@@ -41,16 +42,7 @@ const Dashboard: React.FC = () => {
       case 'beneficiary':
         return <TransparencyDashboard />;
       case 'vendor':
-        return (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-            <Shield className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Vendor Dashboard</h2>
-            <p className="text-gray-600">
-              Your vendor dashboard is coming soon. You'll be able to submit proof of delivery,
-              track payments, and manage your service contracts.
-            </p>
-          </div>
-        );
+        return <VendorDashboard />;
       default:
         return (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
