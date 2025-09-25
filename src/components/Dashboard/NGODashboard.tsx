@@ -675,6 +675,9 @@ const NGODashboard: React.FC = () => {
                   >
                     Approve & Release Payment
                   </button>
+                  {expenditure.status === 'rejected' && (
+                    <span className="px-3 py-2 rounded-md text-sm bg-red-100 text-red-800">AI flagged receipt as not genuine. Please request a valid receipt.</span>
+                  )}
                 </div>
               </div>
             ))}

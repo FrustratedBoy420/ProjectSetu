@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Wallet, Camera } from 'lucide-react';
+import { Loader2, Wallet, Camera, FileText } from 'lucide-react';
 import { Expenditure } from '../../types';
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
@@ -26,6 +26,8 @@ const VendorDashboard: React.FC<{ vendorId?: string }> = ({ vendorId = 'vendor1'
   const [requests, setRequests] = useState<VendorRequest[]>([]);
   const [payments, setPayments] = useState<Expenditure[]>([]);
   const [proofFiles, setProofFiles] = useState<File[]>([]);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [selectedExpForReceipt, setSelectedExpForReceipt] = useState<string>('');
 
   useEffect(() => {
     const load = async () => {
@@ -179,6 +181,46 @@ const VendorDashboard: React.FC<{ vendorId?: string }> = ({ vendorId = 'vendor1'
             </div>
           ))}
           {payments.length===0 && <div className="text-sm text-gray-500">No payments yet.</div>}
+
+          {/* Receipt OCR + Budget Verification */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4 mt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <FileText className="h-4 w-4 text-purple-600" />
+              <div className="font-medium text-gray-900">Upload Receipt for AI Verification (OCR + Budget Check)</div>
+            </div>
+            <select
+              className="border border-gray-300 rounded-md px-3 py-2 text-sm mb-2"
+              onChange={(e)=> setSelectedExpForReceipt(e.target.value)}
+              value={selectedExpForReceipt}
+            >
+              <option value="" disabled>Select expenditure</option>
+              {payments.map(p => (
+                <option key={p.id} value={p.id}>Expenditure #{p.id} • Project {p.projectId} • ₹{p.amount.toLocaleString()}</option>
+              ))}
+            </select>
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={(e)=> setReceiptFile(e.target.files?.[0] || null)}
+              className="w-full text-sm mb-2"
+            />
+            <button
+              onClick={async ()=>{
+                try {
+                  if (!selectedExpForReceipt) { toast.error('Select an expenditure'); return; }
+                  if (!receiptFile) { toast.error('Choose a receipt file'); return; }
+                  const updated = await api.uploadVendorReceipt(selectedExpForReceipt, receiptFile);
+                  setPayments(prev => prev.map(p => p.id===updated.id? updated : p));
+                  toast.success(updated.aiVerification?.verified ? 'Receipt verified within budget' : 'Receipt analyzed with anomalies');
+                } catch (e) {
+                  console.error(e);
+                  toast.error('Receipt upload failed');
+                }
+              }}
+              className="bg-purple-600 text-white px-3 py-2 rounded-md text-sm"
+            >Analyze Receipt</button>
+            <div className="text-xs text-gray-500 mt-2">The AI reads the receipt (brand, quantity, price) and checks it against the project’s pre-approved itemized budget.</div>
+          </div>
         </div>
       )}
 

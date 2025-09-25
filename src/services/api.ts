@@ -195,6 +195,19 @@ const mockVendors: Vendor[] = [
   { id: 'vendor10', name: 'SkillBridge Trainers', category: 'Training', rating: 4.8, location: 'Mumbai' }
 ];
 
+// Mock per-project itemized budgets for OCR verification
+const projectBudgets: Record<string, Array<{ item: string; brand?: string; maxUnitPrice: number }>> = {
+  '1': [
+    { item: 'Water pump', brand: 'AquaTech', maxUnitPrice: 30000 },
+    { item: 'Purification tablets', brand: 'HealthCare', maxUnitPrice: 100 },
+  ],
+  '2': [
+    { item: 'Bricks', maxUnitPrice: 12 },
+    { item: 'Cement', brand: 'BuildRight', maxUnitPrice: 450 },
+    { item: 'Textbooks', brand: 'EduSupply', maxUnitPrice: 250 },
+  ],
+};
+
 export const api = {
   // Projects
   getProjects: async (): Promise<Project[]> => {
@@ -380,6 +393,57 @@ export const api = {
     const approvals = existing?.approvals || [];
     const quorum = existing?.quorum || { required: 3, current: approvals.filter(a => a.approved).length, achieved: false };
     return await api.updateExpenditure(expenditureId, { vendorProof: proof, aiVerification: ai, status: 'vendor_submitted', approvals, quorum });
+  },
+
+  // Vendor uploads receipt for OCR + budget verification
+  uploadVendorReceipt: async (
+    expenditureId: string,
+    file: File
+  ): Promise<Expenditure> => {
+    await new Promise(resolve => setTimeout(resolve, 900));
+    const existing = mockExpenditures.find(e => e.id === expenditureId);
+    if (!existing) throw new Error('Expenditure not found');
+
+    // Run mock OCR
+    const ocr = await api.verifyReceiptOCR(file);
+
+    // Compare with itemized project budget
+    const budget = projectBudgets[existing.projectId] || [];
+    const anomalies: string[] = [];
+
+    // Brand check (if brand exists in budget for similar item category)
+    const brandAllowed = budget.some(b =>
+      !b.brand || (ocr.brand || '').toLowerCase().includes(b.brand.toLowerCase())
+    );
+    if (!brandAllowed) {
+      anomalies.push(`Brand mismatch: ${ocr.brand || 'Unknown'} not in approved list`);
+    }
+
+    // Price check against maxUnitPrice (assume price represents total price; approximate unit price)
+    const maxAllowed = Math.max(...budget.map(b => b.maxUnitPrice), 0) || 0;
+    const withinBudget = ocr.price <= Math.max(maxAllowed * Math.max(1, ocr.quantity), maxAllowed);
+    if (!withinBudget) {
+      anomalies.push(`Price exceeds budget threshold (₹${ocr.price.toLocaleString()})`);
+    }
+
+    // Quantity sanity check
+    if (ocr.quantity <= 0) {
+      anomalies.push('Quantity must be greater than zero');
+    }
+
+    const verified = brandAllowed && withinBudget && anomalies.length === 0;
+
+    const aiVerification: Expenditure['aiVerification'] = {
+      ocrResults: { brand: ocr.brand, quantity: ocr.quantity, price: ocr.price },
+      authenticity: verified ? 0.96 : 0.78,
+      anomalies,
+      verified,
+      timestamp: new Date()
+    };
+
+    const status: Expenditure['status'] = verified ? 'ai_verified' : 'rejected';
+
+    return await api.updateExpenditure(expenditureId, { aiVerification, status });
   },
 
   // AI Verification
