@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Loader2, Wallet, Camera } from 'lucide-react';
 import { Expenditure } from '../../types';
 import { api } from '../../services/api';
 import toast from 'react-hot-toast';
-import CameraCapture from '../Shared/CameraCapture';
+ 
 
 interface VendorRequest {
   id: string;
@@ -24,6 +25,7 @@ const VendorDashboard: React.FC<{ vendorId?: string }> = ({ vendorId = 'vendor1'
   const [notifications, setNotifications] = useState<{ id: string; title: string; message: string; createdAt: Date; read: boolean }[]>([]);
   const [requests, setRequests] = useState<VendorRequest[]>([]);
   const [payments, setPayments] = useState<Expenditure[]>([]);
+  const [proofFiles, setProofFiles] = useState<File[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -80,6 +82,9 @@ const VendorDashboard: React.FC<{ vendorId?: string }> = ({ vendorId = 'vendor1'
                 <div className="font-semibold text-gray-900">{r.projectTitle}</div>
                 <div className="text-sm text-gray-600">{r.ngoName} • {r.description}</div>
                 <div className="text-sm text-gray-600">Amount: ₹{r.amount.toLocaleString()} • {r.createdAt.toLocaleDateString()}</div>
+                <div className="mt-2">
+                  <Link to={`/projects/${r.projectId}`} className="text-xs text-blue-600 hover:text-blue-700">View Details</Link>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <span className={`px-2 py-1 rounded-full text-xs ${r.status==='pending'?'bg-yellow-100 text-yellow-800':r.status==='accepted'?'bg-blue-100 text-blue-800':'bg-green-100 text-green-800'}`}>{r.status.toUpperCase()}</span>
@@ -104,11 +109,11 @@ const VendorDashboard: React.FC<{ vendorId?: string }> = ({ vendorId = 'vendor1'
           ))}
           {requests.length===0 && <div className="text-sm text-gray-500">No pending requests.</div>}
 
-          {/* Quick Proof Upload with geotag (for accepted requests) */}
+          {/* Proof Upload with geotag (for accepted requests) */}
           <div className="bg-white rounded-lg border border-gray-200 p-4">
             <div className="flex items-center gap-2 mb-3">
               <Camera className="h-4 w-4 text-blue-600" />
-              <div className="font-medium text-gray-900">Capture Proof Photo (auto-geotag)</div>
+              <div className="font-medium text-gray-900">Upload Geotagged Photo</div>
             </div>
             <select
               className="border border-gray-300 rounded-md px-3 py-2 text-sm mb-2"
@@ -120,31 +125,43 @@ const VendorDashboard: React.FC<{ vendorId?: string }> = ({ vendorId = 'vendor1'
                 <option key={r.id} value={`${r.id}|${r.expenditureId||''}`}>{r.projectTitle} • ₹{r.amount.toLocaleString()}</option>
               ))}
             </select>
-            <CameraCapture onCapture={async (file)=>{
-              try {
-                const sel = (window as any).selectedReq as string;
-                if (!sel) { toast.error('Select a request first'); return; }
-                const parts = sel.split('|');
-                const expId = parts[1];
-                if (!expId) { toast.error('No expenditure linked'); return; }
-                const getLocation = (): Promise<[number, number]> => new Promise((resolve) => {
-                  if (navigator && 'geolocation' in navigator) {
-                    navigator.geolocation.getCurrentPosition(
-                      (pos) => resolve([pos.coords.latitude, pos.coords.longitude]),
-                      () => resolve([26.9124, 75.7873])
-                    );
-                  } else {
-                    resolve([26.9124, 75.7873]);
-                  }
-                });
-                const location = await getLocation();
-                await api.uploadVendorProof(expId, [file], 'On-site proof', location);
-                toast.success('Photo uploaded with geotag; visible publicly after approval');
-              } catch {
-                toast.error('Failed to upload proof');
-              }
-            }} />
-            <div className="text-xs text-gray-500 mt-2">Location is attached automatically on upload by the platform and the photo will be public on approval.</div>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e)=> setProofFiles(Array.from(e.target.files || []))}
+              className="w-full text-sm mb-2"
+            />
+            <button
+              onClick={async ()=>{
+                try {
+                  const sel = (window as any).selectedReq as string;
+                  if (!sel) { toast.error('Select a request first'); return; }
+                  const parts = sel.split('|');
+                  const expId = parts[1];
+                  if (!expId) { toast.error('No expenditure linked'); return; }
+                  if (!proofFiles.length) { toast.error('Select at least one photo'); return; }
+                  const getLocation = (): Promise<[number, number]> => new Promise((resolve) => {
+                    if (navigator && 'geolocation' in navigator) {
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) => resolve([pos.coords.latitude, pos.coords.longitude]),
+                        () => resolve([26.9124, 75.7873])
+                      );
+                    } else {
+                      resolve([26.9124, 75.7873]);
+                    }
+                  });
+                  const location = await getLocation();
+                  await api.uploadVendorProof(expId, proofFiles, 'On-site proof', location);
+                  setProofFiles([]);
+                  toast.success('Photo(s) uploaded with geotag; visible publicly after approval');
+                } catch {
+                  toast.error('Failed to upload proof');
+                }
+              }}
+              className="bg-blue-600 text-white px-3 py-2 rounded-md text-sm"
+            >Upload</button>
+            <div className="text-xs text-gray-500 mt-2">Allow location when prompted so the platform can attach coordinates automatically. Uploaded photos include a timestamp.</div>
           </div>
         </div>
       )}
@@ -158,6 +175,7 @@ const VendorDashboard: React.FC<{ vendorId?: string }> = ({ vendorId = 'vendor1'
                 <div className="text-sm text-gray-700">₹{p.amount.toLocaleString()} • {p.category}</div>
               </div>
               <span className={`px-2 py-1 rounded-full text-xs ${p.status==='completed'?'bg-green-100 text-green-800':'bg-gray-100 text-gray-800'}`}>{p.status.toUpperCase()}</span>
+              <Link to={`/projects/${p.projectId}`} className="text-xs text-blue-600 hover:text-blue-700">View Details</Link>
             </div>
           ))}
           {payments.length===0 && <div className="text-sm text-gray-500">No payments yet.</div>}

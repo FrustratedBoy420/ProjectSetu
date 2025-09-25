@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Eye, MapPin, Images, CheckCircle2, Clock, FileText, UserCheck, ThumbsUp } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Project, Expenditure, DashboardStats, ProjectUpdate } from '../../types';
 import { api } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -106,7 +107,7 @@ const TransparencyDashboard: React.FC = () => {
                                 <div className="flex-1">
                                     <h4 className="text-lg font-medium text-gray-900">{project.title}</h4>
                                     <p className="text-sm text-gray-600 mt-1">{project.description}</p>
-                                    <div className="flex items-center space-x-4 mt-2">
+                                <div className="flex items-center space-x-4 mt-2">
                                         <div className="flex items-center text-sm text-gray-500">
                                             <MapPin className="h-4 w-4 mr-1" />
                                             {project.location.address}
@@ -115,6 +116,7 @@ const TransparencyDashboard: React.FC = () => {
                                             <Eye className="h-4 w-4 mr-1" />
                                             {Math.round((project.raisedAmount / project.targetAmount) * 100)}% funded
                                         </div>
+                                    <Link to={`/projects/${project.id}`} className="text-xs text-blue-600 hover:text-blue-700">View Details</Link>
                                     </div>
                                 </div>
                                 <div className="text-right">

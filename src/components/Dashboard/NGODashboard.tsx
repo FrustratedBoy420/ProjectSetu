@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Plus, Users, DollarSign, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Project, Expenditure, DashboardStats, Vendor, ProjectUpdate } from '../../types';
@@ -360,6 +361,7 @@ const NGODashboard: React.FC = () => {
                       <Users className="h-4 w-4 mr-1" />
                       {project.beneficiaryCount} beneficiaries
                     </div>
+                    <Link to={`/projects/${project.id}`} className="text-blue-600 hover:text-blue-700 text-xs">View Details</Link>
                     <button
                       onClick={async ()=>{
                         try {
