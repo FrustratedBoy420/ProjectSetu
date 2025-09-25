@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { MapPin, Users, Calendar, Heart, TrendingUp, Filter } from 'lucide-react';
 import { Project } from '../types';
 import { api } from '../services/api';
@@ -13,8 +13,10 @@ const Projects: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [donationAmount, setDonationAmount] = useState<{ [key: string]: string }>({});
   const [donatingTo, setDonatingTo] = useState<string | null>(null);
+  const [txHashByProject, setTxHashByProject] = useState<{ [key: string]: string }>({});
 
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { connected, sendTransaction } = useWeb3();
 
   useEffect(() => {
@@ -59,11 +61,11 @@ const Projects: React.FC = () => {
     setDonatingTo(projectId);
 
     try {
-      // Simulate blockchain transaction
-      const txHash = await sendTransaction('0x742d35Cc6634C0532925a3b8D4C9db96DfbF3b87', amount);
-
-      // Create transaction record
+      // Validate and record transaction (enforces limits)
       await api.createTransaction(projectId, parseFloat(amount));
+
+      // Simulate blockchain transaction after validation
+      const txHash = await sendTransaction('0x742d35Cc6634C0532925a3b8D4C9db96DfbF3b87', amount);
 
       toast.success('Donation successful! Transaction recorded on blockchain.');
 
@@ -76,10 +78,11 @@ const Projects: React.FC = () => {
 
       // Clear donation amount
       setDonationAmount(prev => ({ ...prev, [projectId]: '' }));
+      setTxHashByProject(prev => ({ ...prev, [projectId]: txHash }));
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Donation failed:', error);
-      toast.error('Donation failed. Please try again.');
+      toast.error(error?.message || 'Donation failed. Please try again.');
     } finally {
       setDonatingTo(null);
     }
@@ -130,8 +133,16 @@ const Projects: React.FC = () => {
 
         {/* Projects Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
-          {filteredProjects.map((project) => (
-            <div key={project.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+            {filteredProjects.map((project) => (
+             <div
+               key={project.id}
+               className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+               onClick={(e) => {
+                 const target = e.target as HTMLElement;
+                 if (target.closest('input, button, a, select, textarea')) return;
+                 navigate(`/projects/${project.id}`);
+               }}
+             >
               <img
                 src={project.images[0]}
                 alt={project.title}
@@ -224,18 +235,28 @@ const Projects: React.FC = () => {
                       </button>
                     </div>
                   )}
+                  {txHashByProject[project.id] && (
+                    <a
+                      href={`https://polygonscan.com/tx/${txHashByProject[project.id]}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-blue-600 hover:text-blue-700"
+                    >
+                      View on Polygonscan
+                    </a>
+                  )}
                   {user && user.role === 'donor' && (
                     <div className="text-xs text-gray-500">
                       Remaining you can donate: ₹{Math.max(project.targetAmount - project.raisedAmount, 0).toLocaleString()}
                     </div>
                   )}
-                  <Link
-                    to={`/projects/${project.id}`}
+                  <button
+                    onClick={() => navigate(`/projects/${project.id}`)}
                     className="w-full bg-gray-100 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors flex items-center justify-center space-x-1"
                   >
                     <TrendingUp className="h-4 w-4" />
                     <span>View Details</span>
-                  </Link>
+                  </button>
                 </div>
               </div>
             </div>
