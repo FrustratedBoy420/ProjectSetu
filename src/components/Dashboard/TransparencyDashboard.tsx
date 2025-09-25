@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Eye, MapPin, Images, CheckCircle2, Clock, FileText, UserCheck } from 'lucide-react';
-import { Project, Expenditure, DashboardStats } from '../../types';
+import { Eye, MapPin, Images, CheckCircle2, Clock, FileText, UserCheck, ThumbsUp } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Project, Expenditure, DashboardStats, ProjectUpdate } from '../../types';
 import { api } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -10,19 +11,22 @@ const TransparencyDashboard: React.FC = () => {
     const [projects, setProjects] = useState<Project[]>([]);
     const [expenditures, setExpenditures] = useState<Expenditure[]>([]);
     const [loading, setLoading] = useState(true);
+    const [updates, setUpdates] = useState<ProjectUpdate[]>([]);
     const { user } = useAuth();
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [statsData, projectsData, expendituresData] = await Promise.all([
+                const [statsData, projectsData, expendituresData, updatesData] = await Promise.all([
                     api.getDashboardStats('user-shared', 'shared'),
                     api.getProjects(),
-                    api.getExpenditures()
+                    api.getExpenditures(),
+                    api.getProjectUpdates()
                 ]);
                 setStats(statsData);
                 setProjects(projectsData);
                 setExpenditures(expendituresData);
+                setUpdates(updatesData);
             } finally {
                 setLoading(false);
             }
@@ -103,7 +107,7 @@ const TransparencyDashboard: React.FC = () => {
                                 <div className="flex-1">
                                     <h4 className="text-lg font-medium text-gray-900">{project.title}</h4>
                                     <p className="text-sm text-gray-600 mt-1">{project.description}</p>
-                                    <div className="flex items-center space-x-4 mt-2">
+                                <div className="flex items-center space-x-4 mt-2">
                                         <div className="flex items-center text-sm text-gray-500">
                                             <MapPin className="h-4 w-4 mr-1" />
                                             {project.location.address}
@@ -112,6 +116,7 @@ const TransparencyDashboard: React.FC = () => {
                                             <Eye className="h-4 w-4 mr-1" />
                                             {Math.round((project.raisedAmount / project.targetAmount) * 100)}% funded
                                         </div>
+                                    <Link to={`/projects/${project.id}`} className="text-xs text-blue-600 hover:text-blue-700">View Details</Link>
                                     </div>
                                 </div>
                                 <div className="text-right">
@@ -125,6 +130,48 @@ const TransparencyDashboard: React.FC = () => {
                                         className="bg-blue-600 h-2 rounded-full"
                                         style={{ width: `${(project.raisedAmount / project.targetAmount) * 100}%` }}
                                     ></div>
+                                </div>
+                            </div>
+
+                            <div className="mt-5">
+                                <h5 className="text-sm font-semibold text-gray-900 mb-3">Project Updates</h5>
+                                <div className="space-y-3">
+                                    {updates.filter(u=>u.projectId===project.id).map(u => (
+                                        <div key={u.id} className="border border-gray-200 rounded-lg p-4">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <div className="font-medium text-gray-900">{u.stage} • {u.percent}%</div>
+                                                    <div className="text-xs text-gray-500">{u.createdAt.toLocaleString()}</div>
+                                                    {u.note && <div className="text-sm text-gray-700 mt-1">{u.note}</div>}
+                                                    {u.transactionsNote && <div className="text-xs text-gray-600 mt-1">Transactions: {u.transactionsNote}</div>}
+                                                </div>
+                                                <div className="text-xs text-gray-500 text-right">
+                                                    Donor approvals: {u.approvals.filter(a=>a.approved).length}
+                                                </div>
+                                            </div>
+                                            {user?.role === 'donor' && (
+                                                <div className="mt-3">
+                                                    <button
+                                                        onClick={async ()=>{
+                                                            try {
+                                                                const updated = await api.approveProjectUpdate(u.id, user.id, true);
+                                                                setUpdates(prev => prev.map(x => x.id===updated.id? updated : x));
+                                                                toast.success('Progress approved');
+                                                            } catch {
+                                                                toast.error('Failed to approve');
+                                                            }
+                                                        }}
+                                                        className="inline-flex items-center gap-1 bg-green-600 text-white px-3 py-1.5 rounded-md text-xs hover:bg-green-700"
+                                                    >
+                                                        <ThumbsUp className="h-3 w-3"/> Approve Progress
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {updates.filter(u=>u.projectId===project.id).length===0 && (
+                                        <div className="text-xs text-gray-500">No updates yet.</div>
+                                    )}
                                 </div>
                             </div>
 

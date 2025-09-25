@@ -1,4 +1,4 @@
-import { Project, Transaction, Expenditure, DashboardStats, Vendor, Review } from '../types';
+import { Project, Transaction, Expenditure, DashboardStats, Vendor, Review, ProjectUpdate } from '../types';
 import { emitDonationEvent } from './events';
 
 // Mock data
@@ -207,6 +207,52 @@ export const api = {
     return mockProjects.find(p => p.id === id) || null;
   },
 
+  createProject: async (data: {
+    title: string;
+    description: string;
+    targetAmount: number;
+    ngoId: string;
+    ngoName: string;
+    category: string;
+    locationAddress: string;
+    imageUrl?: string;
+    endDate?: Date;
+    beneficiaryCount?: number;
+  }): Promise<Project> => {
+    await new Promise(resolve => setTimeout(resolve, 600));
+    const project: Project = {
+      id: Date.now().toString(),
+      title: data.title,
+      description: data.description,
+      targetAmount: data.targetAmount,
+      raisedAmount: 0,
+      ngoId: data.ngoId,
+      ngoName: data.ngoName,
+      beneficiaryCount: data.beneficiaryCount ?? 0,
+      category: data.category,
+      location: {
+        address: data.locationAddress,
+        coordinates: [26.9124, 75.7873]
+      },
+      status: 'active',
+      images: [data.imageUrl || 'https://images.pexels.com/photos/1720186/pexels-photo-1720186.jpeg'],
+      createdAt: new Date(),
+      endDate: data.endDate || new Date(Date.now() + 1000*60*60*24*90)
+    };
+    mockProjects.unshift(project);
+    return project;
+  },
+
+  deleteProject: async (id: string): Promise<void> => {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const idx = mockProjects.findIndex(p => p.id === id);
+    if (idx >= 0) {
+      mockProjects.splice(idx, 1);
+    } else {
+      throw new Error('Project not found');
+    }
+  },
+
   // Transactions
   createTransaction: async (projectId: string, amount: number): Promise<Transaction> => {
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -392,23 +438,146 @@ export const api = {
     return await api.updateExpenditure(expenditureId, { approvals, quorum: { required, current, achieved }, status });
   },
 
-  // Chatbot
-  sendChatMessage: async (message: string, _language: string = 'en'): Promise<string> => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
+  // --- Project Updates (in-memory) ---
+  addProjectUpdate: async (projectId: string, stage: string, percent: number, note?: string, transactionsNote?: string): Promise<ProjectUpdate> => {
+    await new Promise(resolve => setTimeout(resolve, 250));
+    const update: ProjectUpdate = {
+      id: Date.now().toString(),
+      projectId,
+      stage,
+      percent: Math.max(0, Math.min(100, Math.round(percent))),
+      note,
+      transactionsNote,
+      createdAt: new Date(),
+      approvals: []
+    };
+    projectUpdatesStore.unshift(update);
+    return update;
+  },
 
-    const responses = {
-      'how to donate': 'To make a donation, go to the Projects page, select a project you want to support, and click "Donate Now". You can pay using your connected wallet or traditional payment methods.',
-      'track donation': 'You can track your donations in real-time through your dashboard. Every transaction is recorded on the blockchain for complete transparency.',
-      'triple lock': 'The Triple-Lock system ensures your donation reaches beneficiaries through three verification steps: vendor proof, AI verification, and beneficiary confirmation.',
-      'default': 'I\'m here to help you with Project Setu! You can ask me about donations, tracking funds, the Triple-Lock system, or any other questions about our platform.'
+  getProjectUpdates: async (projectId?: string): Promise<ProjectUpdate[]> => {
+    await new Promise(resolve => setTimeout(resolve, 200));
+    return projectId ? projectUpdatesStore.filter(u => u.projectId === projectId) : [...projectUpdatesStore];
+  },
+
+  approveProjectUpdate: async (updateId: string, donorId: string, approved: boolean): Promise<ProjectUpdate> => {
+    await new Promise(resolve => setTimeout(resolve, 200));
+    const idx = projectUpdatesStore.findIndex(u => u.id === updateId);
+    if (idx < 0) throw new Error('Update not found');
+    const u = projectUpdatesStore[idx];
+    const others = (u.approvals || []).filter(a => a.donorId !== donorId);
+    const updated: ProjectUpdate = { ...u, approvals: [{ donorId, approved, timestamp: new Date() }, ...others] };
+    projectUpdatesStore[idx] = updated;
+    return updated;
+  },
+
+  // Chatbot (EN/HI intent-based)
+  sendChatMessage: async (message: string, language: string = 'en'): Promise<string> => {
+    await new Promise(resolve => setTimeout(resolve, 400));
+
+    const text = (message || '').trim();
+    const lower = text.toLowerCase();
+    const isHindiInput = /[\u0900-\u097F]/.test(text);
+    const lang = language === 'hi' || isHindiInput ? 'hi' : 'en';
+
+    // Helpers
+    const en = (s: string) => s;
+    const hi = (s: string) => s;
+
+    // Knowledge base (high-level FAQs)
+    const KB = {
+      whatIs: {
+        en: en('Project Setu is a transparency-first funding platform that connects donors, NGOs, vendors, and beneficiaries. It records spending on-chain and verifies each step using a Triple‑Lock process.'),
+        hi: hi('प्रोजेक्ट सेतु एक पारदर्शिता-केंद्रित फंडिंग प्लेटफ़ॉर्म है जो दानदाताओं, एनजीओ, वेंडर्स और लाभार्थियों को जोड़ता है। यह खर्च को ब्लॉकचेन पर दर्ज करता है और ट्रिपल‑लॉक प्रक्रिया से हर चरण की जांच करता है।')
+      },
+      howDonate: {
+        en: en('Go to the Projects page, open a project, then click "Donate Now". You can pay via connected wallet or supported payment methods. The donation is tracked on-chain.'),
+        hi: hi('प्रोजेक्ट्स पेज पर जाएँ, किसी प्रोजेक्ट को खोलें और "Donate Now" पर क्लिक करें। आप जुड़े हुए वॉलेट या सपोर्टेड पेमेंट तरीकों से भुगतान कर सकते हैं। दान ऑन‑चेन ट्रैक होता है।')
+      },
+      track: {
+        en: en('Open Dashboard → see your donations and each expenditure. Every transaction appears on the public ledger and your dashboard in near real time.'),
+        hi: hi('डैशबोर्ड खोलें → अपनी डोनेशन्स और प्रत्येक व्यय देखें। हर ट्रांज़ैक्शन पब्लिक लेजर और आपके डैशबोर्ड पर लगभग रियल‑टाइम में दिखता है।')
+      },
+      tripleLock: {
+        en: en('Triple‑Lock = (1) Vendor Proof (photos + geo‑tag), (2) AI Verification (OCR/anomaly checks), (3) Beneficiary Confirmation (quorum). Funds move only when checks pass.'),
+        hi: hi('ट्रिपल‑लॉक = (1) वेंडर प्रूफ (फोटो + जियो‑टैग), (2) एआई वेरिफिकेशन (ओसीआर/अनियमितता जाँच), (3) लाभार्थी पुष्टि (क्वोरम)। जांच पास होने पर ही फंड आगे बढ़ता है।')
+      },
+      fees: {
+        en: en('Platform fees are minimal and shown transparently before you confirm the donation. Network fees may apply for on‑chain transactions.'),
+        hi: hi('प्लेटफ़ॉर्म शुल्क न्यूनतम है और डोनेशन कन्फ़र्म करने से पहले पारदर्शी रूप से दिखाया जाता है। ऑन‑चेन ट्रांज़ैक्शन पर नेटवर्क शुल्क लग सकता है।')
+      },
+      security: {
+        en: en('Security: on‑chain records, AI verification, beneficiary quorum, and audit trails. You control your wallet; we never store private keys.'),
+        hi: hi('सुरक्षा: ऑन‑चेन रिकॉर्ड, एआई वेरिफिकेशन, लाभार्थी क्वोरम और ऑडिट ट्रेल्स। आपका वॉलेट आपके नियंत्रण में रहता है; हम कभी भी प्राइवेट कीज़ स्टोर नहीं करते।')
+      },
+      wallet: {
+        en: en('Connect or disconnect your wallet from the header. Use it to donate and to view on‑chain confirmations linked to your account.'),
+        hi: hi('हेडर से अपना वॉलेट कनेक्ट/डिस्कनेक्ट करें। इसका उपयोग डोनेट करने और अपने खाते से जुड़े ऑन‑चेन कन्फ़र्मेशन देखने के लिए करें।')
+      },
+      register: {
+        en: en('Create an account via Register. Choose your role (donor, NGO, vendor, beneficiary) to access the right dashboard.'),
+        hi: hi('रजिस्टर पेज से अकाउंट बनाएँ। अपनी भूमिका (डोनर, एनजीओ, वेंडर, लाभार्थी) चुनें ताकि सही डैशबोर्ड मिले।')
+      },
+      roles: {
+        en: en('Roles: Donor funds projects; NGO manages projects/expenditures; Vendor fulfills and uploads proof; Beneficiary confirms delivery; Government/oversight can review transparency.'),
+        hi: hi('भूमिकाएँ: डोनर फंड देता है; एनजीओ प्रोजेक्ट/व्यय मैनेज करता है; वेंडर सप्लाई कर प्रूफ अपलोड करता है; लाभार्थी डिलीवरी की पुष्टि करता है; सरकार/निगरानी पारदर्शिता की समीक्षा कर सकती है।')
+      },
+      ledger: {
+        en: en('Public Ledger shows verified expenditures and deliveries that met the quorum. Check the Ledger page for community‑visible records.'),
+        hi: hi('पब्लिक लेजर में वेरीफाइड व्यय और डिलीवरी दिखती हैं जो क्वोरम पूरी करती हैं। सामुदायिक दृश्य रिकॉर्ड के लिए लेजर पेज देखें।')
+      },
+      vendors: {
+        en: en('Vendors receive NGO requests, complete work, and upload geo‑tagged proof. Payments are released after AI and beneficiary checks.'),
+        hi: hi('वेंडर्स को एनजीओ से अनुरोध मिलते हैं, वे कार्य पूरा कर जियो‑टैग्ड प्रूफ अपलोड करते हैं। एआई और लाभार्थी जाँच के बाद भुगतान जारी होता है।')
+      },
+      contact: {
+        en: en('Contact: email contact@projectsetu.org | Phone +91 98765 43210. Happy to help!'),
+        hi: hi('संपर्क: email contact@projectsetu.org | फ़ोन +91 98765 43210. सहायता हेतु हम उपलब्ध हैं!')
+      },
+      refund: {
+        en: en('Refunds depend on project status and policy. Write to support with your transaction ID; we will review transparently.'),
+        hi: hi('रिफंड प्रोजेक्ट की स्थिति और नीति पर निर्भर करता है। अपना ट्रांज़ैक्शन आईडी भेजकर सपोर्ट से लिखें; हम पारदर्शी समीक्षा करेंगे।')
+      }
+    } as const;
+
+    // Intent checks
+    const is = {
+      donate: /(donat|fund|give|pay|contribut)|दान|डोनेट/.test(lower),
+      track: /(track|status|where.*(money|fund)|देख|ट्रैक)/.test(lower),
+      triple: /(triple|lock|triple\s*-?\s*lock|तीन|ट्रिपल)/.test(lower),
+      what: /(what\s+is|about|explain|overview|क्या|क्या|परिचय)/.test(lower),
+      fees: /(fee|charges|cost|charge|फीस|शुल्क)/.test(lower),
+      security: /(secure|security|safe|risk|सुरक्षा|सुरक्षित)/.test(lower),
+      wallet: /(wallet|metamask|connect|disconnect|वॉलेट|जोड़)/.test(lower),
+      register: /(register|sign\s*up|create\s*account|रजिस्टर|खाता)/.test(lower),
+      roles: /(role|ngo|vendor|beneficiar|government|भूमिका|एनजीओ|वेंडर|लाभार्थी|सरकार)/.test(lower),
+      ledger: /(ledger|public|transparen|लेजर|पब्लिक|पारदर्श)/.test(lower),
+      vendors: /(vendor|supplier|proof|geo|वेंडर|प्रूफ|जियो)/.test(lower),
+      contact: /(contact|email|support|help|फोन|संपर्क)/.test(lower),
+      refund: /(refund|chargeback|cancel|रिफंड|वापसी)/.test(lower)
     };
 
-    const lowerMessage = message.toLowerCase();
-    if (lowerMessage.includes('donate')) return responses['how to donate'];
-    if (lowerMessage.includes('track')) return responses['track donation'];
-    if (lowerMessage.includes('triple') || lowerMessage.includes('lock')) return responses['triple lock'];
+    const pick = (entry: { en: string; hi: string }) => (lang === 'hi' ? entry.hi : entry.en);
 
-    return responses['default'];
+    if (is.what) return pick(KB.whatIs);
+    if (is.triple) return pick(KB.tripleLock);
+    if (is.donate) return pick(KB.howDonate);
+    if (is.track) return pick(KB.track);
+    if (is.fees) return pick(KB.fees);
+    if (is.security) return pick(KB.security);
+    if (is.wallet) return pick(KB.wallet);
+    if (is.register) return pick(KB.register);
+    if (is.roles) return pick(KB.roles);
+    if (is.ledger) return pick(KB.ledger);
+    if (is.vendors) return pick(KB.vendors);
+    if (is.contact) return pick(KB.contact);
+    if (is.refund) return pick(KB.refund);
+
+    const fallback = {
+      en: en("I can help with Project Setu topics like donations, tracking, Triple‑Lock, roles, vendors, public ledger, security, fees, and support. What would you like to know?"),
+      hi: hi('मैं प्रोजेक्ट सेतु से जुड़ी बातें जैसे डोनेशन, ट्रैकिंग, ट्रिपल‑लॉक, भूमिकाएँ, वेंडर्स, पब्लिक लेजर, सुरक्षा, फीस और सपोर्ट में मदद कर सकता/सकती हूँ। आप क्या जानना चाहेंगे?')
+    };
+    return lang === 'hi' ? fallback.hi : fallback.en;
   }
 };
 
@@ -421,6 +590,11 @@ export async function getPublicLedger(): Promise<Expenditure[]> {
 // Reviews (in-memory mock)
 const mockReviews: Review[] = [];
 const vendorReviewStore: Array<{ id: string; vendorId: string; userId: string; userName: string; rating: number; comment: string; createdAt: Date }> = [];
+const projectUpdatesStore: ProjectUpdate[] = [
+  { id: 'u1', projectId: '1', stage: 'Planning', percent: 15, note: 'Survey completed; vendor shortlist created', transactionsNote: 'No transactions yet; planning phase', createdAt: new Date('2024-02-05'), approvals: [] },
+  { id: 'u2', projectId: '1', stage: 'Procurement', percent: 35, note: 'Equipment ordered; delivery expected next week', transactionsNote: 'Advance paid to vendor1 for pumps', createdAt: new Date('2024-02-12'), approvals: [] },
+  { id: 'u3', projectId: '2', stage: 'Construction', percent: 55, note: 'Foundation laid; walls up to 3ft', transactionsNote: 'Materials purchase and labor payouts ongoing', createdAt: new Date('2024-02-15'), approvals: [] }
+];
 
 export async function getProjectReviews(projectId: string): Promise<Review[]> {
   await new Promise(resolve => setTimeout(resolve, 300));

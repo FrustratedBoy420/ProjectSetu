@@ -250,13 +250,13 @@ const Projects: React.FC = () => {
                       Remaining you can donate: ₹{Math.max(project.targetAmount - project.raisedAmount, 0).toLocaleString()}
                     </div>
                   )}
-                  <button
-                    onClick={() => navigate(`/projects/${project.id}`)}
+                  <Link
+                    to={`/projects/${project.id}`}
                     className="w-full bg-gray-100 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors flex items-center justify-center space-x-1"
                   >
                     <TrendingUp className="h-4 w-4" />
                     <span>View Details</span>
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>

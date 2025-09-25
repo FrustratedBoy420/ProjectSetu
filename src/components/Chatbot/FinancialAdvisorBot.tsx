@@ -11,11 +11,11 @@ interface Message {
 
 const FinancialAdvisorBot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [language, setLanguage] = useState((navigator?.language || 'en').split('-')[0]);
+  const [language, setLanguage] = useState((navigator?.language || 'en').split('-')[0].startsWith('hi') ? 'hi' : 'en');
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: 'Hello! I\'m your financial advisor. I can help you understand donations, track your contributions, and explain how the Triple-Lock system works. How can I assist you today?',
+      text: 'Hello! / नमस्ते! I\'m your Setu assistant. Ask in English or Hindi about donations, tracking, Triple‑Lock, roles, vendors, fees, or support.',
       sender: 'bot',
       timestamp: new Date()
     }
@@ -101,8 +101,8 @@ const FinancialAdvisorBot: React.FC = () => {
           <div className="bg-blue-600 text-white p-4 rounded-t-lg flex items-center space-x-2">
             <Bot className="h-5 w-5" />
             <div>
-              <h3 className="font-semibold">Financial Advisor</h3>
-              <p className="text-xs text-blue-100">Always here to help</p>
+              <h3 className="font-semibold">Setu Assistant</h3>
+              <p className="text-xs text-blue-100">Bilingual • द्विभाषी</p>
             </div>
           </div>
 
@@ -155,7 +155,7 @@ const FinancialAdvisorBot: React.FC = () => {
           {/* Quick Questions */}
           {messages.length === 1 && (
             <div className="px-4 pb-2">
-              <p className="text-xs text-gray-500 mb-2">Quick questions:</p>
+              <p className="text-xs text-gray-500 mb-2">Quick questions / त्वरित प्रश्न:</p>
               <div className="space-y-1">
                 {quickQuestions.map((question, index) => (
                   <button
@@ -180,16 +180,13 @@ const FinancialAdvisorBot: React.FC = () => {
               >
                 <option value="en">EN</option>
                 <option value="hi">HI</option>
-                <option value="bn">BN</option>
-                <option value="ta">TA</option>
-                <option value="te">TE</option>
               </select>
               <input
                 type="text"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Ask me anything..."
+                placeholder={language === 'hi' ? 'कुछ भी पूछें...' : 'Ask me anything...'}
                 className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <button

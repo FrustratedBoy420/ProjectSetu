@@ -126,3 +126,14 @@ export interface Review {
   comment: string;
   createdAt: Date;
 }
+
+export interface ProjectUpdate {
+  id: string;
+  projectId: string;
+  stage: string; // e.g., Planning, Procurement, In Progress, Completed
+  percent: number; // 0-100
+  note?: string;
+  transactionsNote?: string; // NGO note describing related transactions/expenditures
+  createdAt: Date;
+  approvals: { donorId: string; approved: boolean; timestamp: Date }[];
+}

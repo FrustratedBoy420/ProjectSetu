@@ -37,8 +37,9 @@ const Dashboard: React.FC = () => {
           </div>
         );
       case 'ngo':
-      case 'government':
         return <NGODashboard />;
+      case 'government':
+        return <TransparencyDashboard />;
       case 'beneficiary':
         return <TransparencyDashboard />;
       case 'vendor':
